@@ -29,7 +29,7 @@ country_map_path = os.path.join(root_path,'dashboard/model_weights/country_map.x
 hot_button_file_path = os.path.join(root_path,'dashboard/model_weights/keywords_search/hot_button_issues.xlsx')
 hot_button_dict_path = os.path.join(root_path,'dashboard/model_weights/keywords_search/hot_button_dict.pickle')
 
-adhoc_check_file_path = os.path.join(root_path,'dashboard/model_weights/keywords_search/minimum_requirement.xlsx')
+adhoc_check_file_path = os.path.join(root_path,'dashboard/model_weights/keywords_search/custom_keywords_sets.xlsx')
 adhoc_check_dict_path = os.path.join(root_path,'dashboard/model_weights/keywords_search/custom_dict.pickle')
 
 

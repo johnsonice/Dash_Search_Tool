@@ -165,65 +165,81 @@ class Hotbutton_finder(object):
 
 
 class Custom_finder(Hotbutton_finder):
-    def __init__(self,custom_file=None,custom_dict_path=None):
+    def __init__(self,custom_file=None,custom_dict_path=None,cach = False):
+        self.cach = cach
         self.custom_file = custom_file
         self.custom_dict_path = custom_dict_path
-        Hotbutton_finder.__init__(self,hot_button_file=custom_file,hot_button_dict_path=custom_dict_path)
-        self.hot_button_dict = self.get_topic_keywords_pairs()
+        #Hotbutton_finder.__init__(self,hot_button_file=custom_file,hot_button_dict_path=custom_dict_path)
+        self.custom_dict_sets = self.get_multi_topic_keywords_pairs_sets()
         print('Load customized dictionary successfully...')
         
-    def get_topic_keywords_pairs(self):
+    def _get_topic_keywords_pairs(self,sheet_name=None):
         print('this is a different function')
         '''read hot button issues and transform to dic of re expression'''
-        if self.custom_file and os.path.isfile(self.custom_dict_path):
+        if self.custom_file and self.custom_dict_path and self.cach:
             re_custom_dict = pickle.load(open(self.custom_dict_path, 'rb'))
             print('load from previous saved dict')
             return re_custom_dict
         
+        if sheet_name is None:
+            raise Exception('Please pass in sheet name that is not Readme')
+            
         ## read raw file
         if os.path.isfile(self.custom_file):
-            custom_df = pd.read_excel(self.custom_file)
+            custom_df = pd.read_excel(self.custom_file,sheet_name=sheet_name)
             custom_df.fillna('', inplace= True)
             ## concanate all search words 
             custom_df['key_words'] = custom_df['key_words'].str.lower().str.replace(r'/|-|_',' ')   
             custom_dict = pd.Series(custom_df['key_words'].values,index=custom_df['name']).to_dict()
             
             re_custom_dict = self.transform_dict_to_re_pair(custom_dict)
-            pickle.dump(re_custom_dict, open(self.custom_dict_path,'wb'))
-            print('Generate new custom_dict in {}'.format(self.custom_dict_path))
+            
+            if self.custom_dict_path:
+                pickle.dump(re_custom_dict, open(self.custom_dict_path,'wb'))
+                print('Generate new custom_dict in {}'.format(self.custom_dict_path))
+            
+            return re_custom_dict
         else:
             raise Exception('file does not exist: {}'.format(self.custom_file))
+    
+    def get_multi_topic_keywords_pairs_sets(self):
+        """
+        read multiple k: kvparis into a dictionary
+        """
+        xl = pd.ExcelFile(self.custom_file)
+        group_keys = [k for k in xl.sheet_names if k.lower() != 'readme']
+        grouped_dicts = {k:self._get_topic_keywords_pairs(k) for k in group_keys}
+        return grouped_dicts
+        
+    def check_all_topics(self,document,thresh=0):
+        final_res_dict = {}
+        for key_name,v_dict in self.custom_dict_sets.items():
+            res_list = []
+            for k, v in v_dict.items():
+                res = self.find_exact_keywords(document,keywords=None,rex=v)
+                #print(res)
+                check = self.consolidate_counts(res,thresh)
+                if check:
+                    res_list.append(k)
+                    
+           # save it in a dictionary
+            final_res_dict[key_name] = res_list
+        
+        return final_res_dict
 # In[5]:
 
 if __name__ == '__main__':
     
-    # Save and load for reuse in production
-    start_time = time.time()
-    
-    hot_button_file = os.path.join('./model_weights/keywords_search/hot_button_issues.xlsx')
-    #text_file_path = "./test/Brazil_2013.DOCX"
     text_file_path = "./test/Canada-2018.docx"
-    save_file = './model_weights/keywords_search/hot_button_dict.pickle'
-    print(os.getcwd())
-    
-    ## initiate hotbutton object 
-    hotbutton_finder = Hotbutton_finder(hot_button_file,save_file)
-    #hotbutton_finder = Custom_finder(hot_button_file,save_file)
-    
-    document = hotbutton_finder.read_doc(text_file_path)
-    print(hotbutton_finder.check_all_topics(document))
-
-    ## run one test 
-    test = 'asd macroprudential asdf savegards  resources reassure discipline government corruption'
-    found_topics = hotbutton_finder.check_all_topics(test)
-    print(found_topics)
-    
     ## test custom dict
     
-    custom_file = './model_weights/keywords_search/minimum_requirement.xlsx'
-    save_file = './model_weights/keywords_search/minimum_requirement.pickle'
+    #custom_file = './model_weights/keywords_search/minimum_requirement.xlsx'
+    custom_file = './model_weights/keywords_search/custom_keywords_sets.xlsx'
+    #save_file = './model_weights/keywords_search/custom_keywords_sets.pickle'
+
     #text_file_path = "./test/Brazil_2013.DOCX"
-    CF = Custom_finder(custom_file,save_file)
+    CF = Custom_finder(custom_file)
+    #%%
     document = CF.read_doc(text_file_path)
     print(CF.check_all_topics(document))
     

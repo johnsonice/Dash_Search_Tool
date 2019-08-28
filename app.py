@@ -23,39 +23,44 @@ from graph_historical_util import get_county_df,get_top_topic_ids,get_plot_df_li
 import config
 #%%
 ## initialize processor
-processor = Processor(config.model_path,
-                      config.dictionary_path,
-                      config.country_map_path,
-                      config.hot_button_file_path,
-                      config.hot_button_dict_path,
-                      config.adhoc_check_file_path,
-                      config.adhoc_check_dict_path)
+processor = Processor(model_path=None,
+                      dictionary_path=None,
+                      country_map_path=config.country_map_path,
+                      custom_file = config.adhoc_check_file_path)
 
-id2name = processor.get_id2name_map(config.id2name_path)
-## get global historical data in memory
-#topic_path = './dashboard/model_weights/Mallet_50_topics_with_country_year_2019_02_12.xlsx'
-if os.path.exists(config.df_agg_pkl_path):
-    print("Load agg historical from pkle")
-    df_agg = pd.read_pickle(config.df_agg_pkl_path)
-else:
-    print('Generate agg historical df data and save as pickle ...')
-    data_df = pd.read_excel(config.historical_data_path,'Document and Topic')
-    df_agg = aggregate_doc_topic_distribution(data_df)
-    df_agg.to_pickle(config.df_agg_pkl_path)
-    
-#%%
-## get country drop down content 
-countries = df_agg.index.get_level_values(0).unique().to_list()
-country_dropdown_data = [{'label':c,'value':c} for c in countries]
-
-## get hotbutton issue list 
-hotbutton_issues = list(processor.hot_button_finder.hot_button_dict.keys())
-hotbutton_issues_items = [{'label':hi,'value':hi} for hi in hotbutton_issues]
 
 ## get minium requirement 
-minium_requirement = list(processor.custom_finder.hot_button_dict.keys())
-minium_requirement_items = [{'label':hi,'value':hi} for hi in minium_requirement]
+custom_groups_keys = list(processor.custom_finder.custom_dict_sets.keys())
+custom_items_sets = {k:[{'label':hi,'value':hi} for hi in list(processor.custom_finder.custom_dict_sets[k].keys())] 
+                        for k in custom_groups_keys}
 
+def build_check_items(custom_items_sets):
+    ## hotbutton issues 
+    elements = []
+    for header,check_items in custom_items_sets.items():
+        ele = html.Div(children=[
+                    html.H5(header,
+                            style={'margin': '5px',
+                                   'padding':'5px',
+                                   }),
+                    dcc.Checklist(
+                        id=header,
+                        options=check_items,
+                        values=[],
+                        labelStyle={'display': 'inline-block',
+                                    'padding':"10px",
+                                    'width':'23.5%',
+                                    'borderWidth':'1px',
+                                    'margin':'6px',
+                                    'borderRadius': '5px',
+                                    'borderStyle': 'solid'
+                                    }
+                    )
+                    ],style={'width': '100%','margin': '10px'}
+                )
+        elements.append(ele)
+    
+    return elements
 #%%
 ## load dash style
 external_stylesheets = [dbc.themes.BOOTSTRAP,'https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -92,6 +97,7 @@ navbar = dbc.NavbarSimple(
 )
 
 img_path = './dashboard/src/imf_seal.png'
+
 def encode_image(image_file):
     encoded = base64.b64encode(open(image_file, 'rb').read())
     return 'data:image/png;base64,{}'.format(encoded.decode())
@@ -105,7 +111,7 @@ elements = [
                     ],style={'width':'20%','margin':'10 auto','textAlign': 'center',}),
     
                     html.H3(
-                        children='SPR Review Document Topic Analysis',
+                        children='SPR LP Program Document Keywords Match',
                         style={
                             'width':'60%',
                             'textAlign': 'center',
@@ -136,104 +142,16 @@ elements = [
                         },
                     # Allow multiple files to be uploaded
                     multiple=True
-                ),
-    
-        ## historical data link
-            html.Div(
-                children=['For historical timeseries analysis, please visit our ',
-                 html.A('Tableau Dashboard', 
-                        href='https://tableau.imf.org/#/views/ArticleIVversionchengyu/Country',
-                        target='_blank',
-                        style={'color':'blue'}
-                        )]
-                ,style={'textAlign': 'center','margin':'auto'}),
-            
-        ## hotbutton issues 
-            html.Div(children=[
-                    html.H5('Hot Button Issues Checklist:',
-                            style={'margin': '5px',
-                                   'padding':'5px',
-                                   }),
-                    dcc.Checklist(
-                        id='hot-button-issues',
-                        options=hotbutton_issues_items,
-                        values=[],
-                        labelStyle={'display': 'inline-block',
-                                    'padding':"10px",
-                                    'width':'23.5%',
-                                    'borderWidth':'1px',
-                                    'margin':'6px',
-                                    'borderRadius': '5px',
-                                    'borderStyle': 'solid'
-                                    }
-                    )
-                    ],style={'width': '100%','margin': '10px'}
-            ),
-    
-        ## minium requirement
-            html.Div(children=[
-                    html.H5('Minimum Requirement Checklist:',
-                            style={'margin': '5px',
-                                   'padding':'5px',
-                                   }),
-                    dcc.Checklist(
-                        id='minimum-requirements',
-                        options=minium_requirement_items,
-                        values=[],
-                        labelStyle={'display': 'inline-block',
-                                    'padding':"10px",
-                                    'width':'23.5%',
-                                    'borderWidth':'1px',
-                                    'margin':'6px',
-                                    'borderRadius': '5px',
-                                    'borderStyle': 'solid'
-                                    }
-                    )
-                    ],style={'width': '100%','margin': '10px'}
-            ),
-            ## build country dropdown 
-            html.Div(id='country-picker',
-                     children=[
-                        html.Div(
-                            children=[   
-                                html.Div(' ',style={'width':"20%"}),
-                                html.Div('Country Name: ',style={'width':"15%",
-                                                                 'textAlign': 'center',
-                                                                 'margin-top': 'auto',
-                                                                 'margin-bottom':'auto'}),
-                                html.Div([            
-                                        dcc.Dropdown(
-                                            id = 'country-dropdown',
-                                            options=country_dropdown_data,
-                                            value='United States'
-                                        )
-                                    ],style={'width':'30%'}),
-                                html.Div(' ',style={'width':"20%"}),
-                            ],className='row',style={'margin':'auto','padding-top':'30px'})
-                        ]
-                ,style={'display':'none'}),
-    
+                )
+    ]
 
-            ## build the graph object 
-            html.Div(id='controls-container2',
-                     #children=[dcc.Graph(id='topic-graph')],
-                     style={'width':'100%',
-                             'display':'block',
-                             'padding':'15px',
-                             'margin': 'auto'}),
-            
-            html.Div(id='controls-container',children=[''],style={'display':'block'}),
+elements.extend(build_check_items(custom_items_sets))
+elements.extend([    ## store intemediate data
+                    html.Div(id='intermediate-value',
+                             style={'display': 'none'}),
+                    html.Div(id='intermediate-value-2',style={'display': 'none'}),
+                ])
 
-#            ## build table object
-#            html.Div(id='output-data-upload',style={'width': '50%',
-#                                                    'margin': 'auto',
-#                                                    'padding':'50px'}),
-            ## store intemediate data
-
-            html.Div(id='intermediate-value',
-                         style={'display': 'none'}),
-            html.Div(id='intermediate-value-2',style={'display': 'none'}),
-        ]
 
 app.layout = html.Div(elements,className='container',style={'max-width': '80%'})
 
@@ -281,52 +199,6 @@ def parse_doc(contents, filename, date,processor=processor):
     res = build_html_table(topic_df,filename,date)
     return res
 
-def create_graph(df,xaxis_name,yaxis_name,id2name):
-    #df[xaxis_name]=df[xaxis_name].apply(lambda x: "Topic-"+str(x))
-    df = copy.copy(df)
-    df[xaxis_name]=df[xaxis_name].apply(lambda x: id2name[x])
-    ## merge ids with same topic 
-    df = df.groupby(xaxis_name).agg(sum)
-    df.reset_index(inplace=True)
-    df.sort_values(by=['content_size'],ascending=False,inplace=True)
-    
-    traces = [
-            go.Bar(x=df[xaxis_name],
-                   y=df[yaxis_name],
-                   text=df[xaxis_name])
-            ]
-    go_layout = go.Layout(title='Document Topic Distribution',
-                          xaxis={'title':xaxis_name,
-                                 'categoryorder': 'array',
-                                 'categoryarray': df[xaxis_name]},
-                          yaxis={'title':yaxis_name},
-                          hovermode='closest')
-    
-    res = {'data':traces,
-           'layout':go_layout}
-    return res
-
-def create_sub_graph(df,xaxis_name,yaxis_name,id2name):
-    df = copy.copy(df)
-    topic_name = id2name[df['gensim_topic'].iloc[0]]
-    df[xaxis_name]=df[xaxis_name].apply(lambda x: "_"+str(x)+"_")
-    traces = [
-            go.Bar(x=df[xaxis_name],
-                   y=df[yaxis_name],
-                   )
-            ]
-    go_layout = go.Layout(title='Topic: {}'.format(topic_name),
-                          xaxis={'title':xaxis_name,
-                                 'categoryorder': 'array',
-                                 'categoryarray': df[xaxis_name]},
-                          yaxis={'title':yaxis_name},
-                          hovermode='closest')
-    
-    res = {'data':traces,
-           'layout':go_layout}
-    return res
-
-
 def process_input_data(contents, filename, date,processor=processor):
     content_type, content_string = contents.split(',')
 
@@ -336,81 +208,36 @@ def process_input_data(contents, filename, date,processor=processor):
         if 'docx' in filename.lower():
             # Assume that the user uploaded a docx file
             #res = read_doc(io.BytesIO(decoded))
-            doc = processor.read_doc(io.BytesIO(decoded))
+            #doc = processor.read_doc(io.BytesIO(decoded))
             ## get country name 
             country_name = processor.country_dector.one_step_get_cname(io.BytesIO(decoded))
-            ## get hotbutton issues 
-            document_for_keywords_check = processor.hot_button_finder.read_doc(io.BytesIO(decoded))
-            filtered_hotbutton_issues =processor.hot_button_finder.check_all_topics(document_for_keywords_check)
+            ## get custom keywords check results 
+            document_for_keywords_check = processor.custom_finder.read_doc(io.BytesIO(decoded))
             filtered_custom_check = processor.custom_finder.check_all_topics(document_for_keywords_check)
             
             ## get topic df
-            topic_df = get_topic_df(processor,doc)
+            #topic_df = get_topic_df(processor,doc)
             
             ## store json data to div
             data_store = {'doc_name':filename,
                           'country_name':country_name,
                           'doc_date':date,
-                          'filtered_hotbutton_issues': filtered_hotbutton_issues,
-                          'filtered_custom_check': filtered_custom_check,
-                          'topic_df':topic_df.to_json(orient='split', date_format='iso')}
+                          #'filtered_hotbutton_issues': filtered_hotbutton_issues,
+                          'filtered_custom_check': filtered_custom_check}
+                          #'topic_df':topic_df.to_json(orient='split', date_format='iso')}
             return json.dumps(data_store)
             
         else:
-            return html.Div([
-                'You much upload a word document. No other type of document is supported at this point.'
-            ])
+#            return html.Div([
+#                'You much upload a word document. No other type of document is supported at this point.'
+#            ])
+            return None
+            
     except Exception as e:
         print(e,file=sys.stdout)
         return html.Div([
             'There was an error processing this file.'
         ])
-    
-def create_all_sub_graph(figures):
-    ## build the graph object 
-    res = [
-                html.Div([
-                    dcc.Graph(id='subgraph-1',figure=figures[0]),
-                    ## build the graph object 
-                    dcc.Graph(id='subgraph-2',figure=figures[1])
-                    ],style= {'width': '49%', 'display': 'inline-block'}),
-            
-                html.Div([
-                    ## build the graph object 
-                    dcc.Graph(id='subgraph-3',figure=figures[2]),
-                    ## build the graph object 
-                    dcc.Graph(id='subgraph-4',figure=figures[3])
-                ],style= {'width': '49%', 'display': 'inline-block'})
-        ]
-    
-    return res
-    
-    
-def update_graph(contents, filename, date,processor=processor):
-    content_type, content_string = contents.split(',')
-
-    decoded = base64.b64decode(content_string)
-    try:
-        if 'docx' in filename.lower():
-            # Assume that the user uploaded a docx file
-            #res = read_doc(io.BytesIO(decoded))
-            doc = processor.read_doc(io.BytesIO(decoded))
-            ## get topic df
-            topic_df = get_topic_df(processor,doc)
-        else:
-            return html.Div([
-                'You much upload a word document. No other type of document is supported at this point.'
-            ])
-    except Exception as e:
-        print(e)
-        return html.Div([
-            'There was an error processing this file.'
-        ])
-    print('chart create')
-    res = create_graph(topic_df,'gensim_topic','content_size',id2name) 
-    return res
-
-
 
 #%%
 @app.callback(Output('intermediate-value', 'children'),
@@ -425,91 +252,30 @@ def store_temp_date(list_of_contents, list_of_names, list_of_dates):
         res = None
     
     return res    
-    
-@app.callback(Output('intermediate-value-2', 'children'),
-              [Input('intermediate-value', 'children'),
-               Input('country-dropdown', 'value')]
-              )
-def store_historical_dfs(json_data,country_name):
-    datasets = json.loads(json_data)
-    doc_name = datasets['doc_name']
-    doc_date = datasets['doc_date']
-    ## load data
-    print(country_name)
-    #country_name = "Brazil"
-    topic_df = pd.read_json(datasets['topic_df'], orient='split')
-    temp = df_agg.loc[country_name,:].reset_index()
-    lattest_year = temp['year'].unique()[-1]
-    country_df = get_county_df(df_agg,country_name,lattest_year)
-    ## get topic ids 
-    topic_ids = get_top_topic_ids(country_df,topic_df,4)
-    ## get ts dfs 
-    ts_dfs = get_plot_df_list(topic_ids,df_agg,topic_df,country_name)
-    
-    data_store = {}
-    for idx,d in enumerate(ts_dfs):
-        data_store['df_'+str(idx)] = d.to_json(orient='split', date_format='iso')
-    
-    return json.dumps(data_store)
-
-@app.callback(Output('country-dropdown', 'value'),
-              [Input('intermediate-value', 'children')]
-              )
-def update_country_dropdown(json_data):
-    datasets = json.loads(json_data)
-    country_name = datasets['country_name']
-    return country_name
-
-@app.callback(Output('hot-button-issues', 'values'),
-              [Input('intermediate-value', 'children')]
-              )
-def update_hot_button_issues(json_data):
-    datasets = json.loads(json_data)
-    issue_names = datasets['filtered_hotbutton_issues']
-    return issue_names
-
-@app.callback(Output('minimum-requirements', 'values'),
-              [Input('intermediate-value', 'children')]
-              )
-def update_minimum_requirements(json_data):
-    datasets = json.loads(json_data)
-    check_names = datasets['filtered_custom_check']
-    return check_names
-
-@app.callback(Output('controls-container2', 'children'),
-              [Input('intermediate-value', 'children')]
-              )
-def update_graph_1(json_data):
-    datasets = json.loads(json_data)
-    doc_name = datasets['doc_name']
-    doc_date = datasets['doc_date']
-    topic_df = pd.read_json(datasets['topic_df'], orient='split')
-    figure = create_graph(topic_df,'gensim_topic','content_size',id2name) 
-    res = [dcc.Graph(id='topic-graph',figure=figure)]
-    return res
-
-@app.callback(Output('controls-container', 'children'),
-              [Input('intermediate-value-2', 'children')]
-              )
-def update_all_sub_graph(json_data):
-    datasets = json.loads(json_data)
-    figures = []
-    for i in range(4):
-        df = pd.read_json(datasets['df_{}'.format(str(i))], orient='split')
-        figure = create_sub_graph(df,'year','content_size_old',id2name) 
-        figures.append(figure)
-    
-    res = create_all_sub_graph(figures)
-    return res
 
 
-@app.callback(Output('country-picker', 'style'), 
-              [Input('intermediate-value', 'children')])
-def toggle_container1(data):
-    if data:
-        return {'display': 'block'}
-    else:
-        return {'display': 'none'}
+def make_item_callback_func(item_id):
+    def _function(json_data):
+        if json_data is not None and json_data != 'None':
+            datasets = json.loads(json_data)
+            check_names = datasets['filtered_custom_check'][item_id]
+            return check_names
+        else:
+            return []
+    return _function
+
+for k in custom_groups_keys:
+    app.callback(Output(k, 'values'),
+                  [Input('intermediate-value', 'children')]
+                  )(make_item_callback_func(k))
+
+#@app.callback(Output('country-picker', 'style'), 
+#              [Input('intermediate-value', 'children')])
+#def toggle_container1(data):
+#    if data:
+#        return {'display': 'block'}
+#    else:
+#        return {'display': 'none'}
 
 if __name__ == '__main__':
     #app.run_server(port=8888, host='0.0.0.0', debug=True)
