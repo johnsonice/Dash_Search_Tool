@@ -14,7 +14,7 @@ filter_tiems_sets = {}
 def build_filter_check_list(filter_tiems_sets):
     ## hotbutton issues 
     elements = []
-    for header,check_items in custom_items_sets.items():
+    for header,check_items in filter_tiems_sets.items():
         ele = html.Div(children=[
                     html.H5(header,
                             style={'margin': '5px',
