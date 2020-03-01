@@ -21,8 +21,6 @@ from process_util import Processor
 from evaluate import get_topic_df
 from graph_historical_util import get_county_df,get_top_topic_ids,get_plot_df_list,aggregate_doc_topic_distribution
 import config
-from page_build_utils import build_check_items
-
 #%%
 ## initialize processor
 processor = Processor(model_path=None,
@@ -30,12 +28,39 @@ processor = Processor(model_path=None,
                       country_map_path=config.country_map_path,
                       custom_file = config.adhoc_check_file_path)
 
+
 ## get minium requirement 
 custom_groups_keys = list(processor.custom_finder.custom_dict_sets.keys())
 custom_items_sets = {k:[{'label':hi,'value':hi} for hi in list(processor.custom_finder.custom_dict_sets[k].keys())] 
                         for k in custom_groups_keys}
 
-
+def build_check_items(custom_items_sets):
+    ## hotbutton issues 
+    elements = []
+    for header,check_items in custom_items_sets.items():
+        ele = html.Div(children=[
+                    html.H5(header,
+                            style={'margin': '5px',
+                                   'padding':'5px',
+                                   }),
+                    dcc.Checklist(
+                        id=header,
+                        options=check_items,
+                        values=[],
+                        labelStyle={'display': 'inline-block',
+                                    'padding':"10px",
+                                    'width':'23.5%',
+                                    'borderWidth':'1px',
+                                    'margin':'6px',
+                                    'borderRadius': '5px',
+                                    'borderStyle': 'solid'
+                                    }
+                    )
+                    ],style={'width': '100%','margin': '10px'}
+                )
+        elements.append(ele)
+    
+    return elements
 #%%
 ## load dash style
 external_stylesheets = [dbc.themes.BOOTSTRAP,'https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -43,13 +68,33 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 # Loading screen CSS
 app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/brPBPO.css"})
 
-#app.config.requests_pathname_prefix = ''
+app.config.requests_pathname_prefix = ''
 app.config['suppress_callback_exceptions']=True
 
 colors = {
     'background': '#111111',
     'text': '#7FDBFF'
 }
+
+navbar = dbc.NavbarSimple(
+    children=[
+        dbc.NavItem(dbc.NavLink("Link", href="#")),
+        dbc.DropdownMenu(
+            nav=True,
+            in_navbar=True,
+            label="Menu",
+            children=[
+                dbc.DropdownMenuItem("Entry 1"),
+                dbc.DropdownMenuItem("Entry 2"),
+                dbc.DropdownMenuItem(divider=True),
+                dbc.DropdownMenuItem("Entry 3"),
+            ],
+        ),
+    ],
+    brand='SPR Review Document Topic Analysis',
+    brand_href="#",
+    sticky="top",
+)
 
 img_path = './dashboard/src/imf_seal.png'
 
@@ -162,17 +207,24 @@ def process_input_data(contents, filename, date,processor=processor):
     try:
         if 'docx' in filename.lower():
             # Assume that the user uploaded a docx file
+            #res = read_doc(io.BytesIO(decoded))
+            #doc = processor.read_doc(io.BytesIO(decoded))
             ## get country name 
             country_name = processor.country_dector.one_step_get_cname(io.BytesIO(decoded))
             ## get custom keywords check results 
             document_for_keywords_check = processor.custom_finder.read_doc(io.BytesIO(decoded))
             filtered_custom_check = processor.custom_finder.check_all_topics(document_for_keywords_check)
             
+            ## get topic df
+            #topic_df = get_topic_df(processor,doc)
+            
             ## store json data to div
             data_store = {'doc_name':filename,
                           'country_name':country_name,
                           'doc_date':date,
+                          #'filtered_hotbutton_issues': filtered_hotbutton_issues,
                           'filtered_custom_check': filtered_custom_check}
+                          #'topic_df':topic_df.to_json(orient='split', date_format='iso')}
             return json.dumps(data_store)
             
         else:
@@ -213,7 +265,7 @@ def make_item_callback_func(item_id):
     return _function
 
 for k in custom_groups_keys:
-    app.callback(Output(k, 'value'),
+    app.callback(Output(k, 'values'),
                   [Input('intermediate-value', 'children')]
                   )(make_item_callback_func(k))
 
@@ -224,7 +276,7 @@ for k in custom_groups_keys:
 #        return {'display': 'block'}
 #    else:
 #        return {'display': 'none'}
-#%%
+
 if __name__ == '__main__':
     #app.run_server(port=8888, host='0.0.0.0', debug=True)
     app.run_server(debug=True)
