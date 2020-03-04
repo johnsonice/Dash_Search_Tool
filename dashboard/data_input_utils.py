@@ -9,11 +9,12 @@ Created on Tue Mar  3 21:48:43 2020
 import os,sys
 import pandas as pd
 import re
+
 filter_tiems_sets = {"Account":[{"label":"PRGT",'value':"PRGT"},{"label":"GRA",'value':"GRA"}],
-                     "Stage":[{"label":"Request",'value':"Request"},{"label":"Review",'value':"Review"}],
+                     "Stage":[{"label":"Request",'value':"REQ"},{"label":"Review",'value':"REV"}],
                      "Document":[{"label":"PN",'value':"PN"},{"label":"SR",'value':"SR"}],
-                     "Disbursement":[{"label":"Disbursing",'value':"Disbursing"},{"label":"Emergency",'value':"Emergency"},
-                                     {"label":"Precautionary",'value':"Precautionary"},{"label":"Non-Dispursing",'value':"Non-Dispursing"}],
+                     "Disbursement":[{"label":"Disbursing",'value':"DISB"},{"label":"Emergency",'value':"EMEG"},
+                                     {"label":"Precautionary",'value':"PREC"},{"label":"Non-Dispursing",'value':"NDIS"}],
                       }
 
 class Input_data_processor(object):
@@ -46,8 +47,8 @@ class Input_data_processor(object):
         if input_file_path is None:
             return None
         else:
-            excel_file = pd.ExcelFile(check_list_path)
-            check_regex = re.compile(r'^\d+_.*_')
+            excel_file = pd.ExcelFile(input_file_path)
+            check_regex = re.compile(r'.*_.*_.*_')
             ids = [s for s in excel_file.sheet_names if check_regex.search(s) is not None]
             return ids
         

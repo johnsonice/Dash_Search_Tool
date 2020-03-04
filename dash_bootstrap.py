@@ -11,18 +11,28 @@ from io import BytesIO
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 sys.path.insert(0,'./dashboard')
-from data_input_utils import filter_tiems_sets,Check_tiems_sets ## input contents for check lists
+#from data_input_utils import filter_tiems_sets,Check_tiems_sets ## input contents for check lists
+from data_input_utils import Input_data_processor
 from page_build_utils import build_check_items2,build_card
 
+
 ##############################################################
-    
+## global variable set up 
+check_input_file = './data/ChecklistStata.xlsx'
+data_processor = Input_data_processor()
+filter_tiems_sets = data_processor.filter_tiems_sets
+ids = data_processor.get_custom_sheetnames(check_input_file)
+#content_dict,table_dict,draft_req_dict = data_processor.get_dict_by_sheet(check_input_file,ids[0])
+Check_tiems_sets = data_processor.get_checklist_items(check_input_file,ids[0])
+##############################################################
+
+
 
 ### build navigation bar ############################
 # make a reuseable navitem for the different examples
 #nav_item = dbc.NavItem(dbc.NavLink("SPR Review Automation", href="https://www.imf.org"))
 dropdown = dbc.DropdownMenu(
     children=[
-        dbc.DropdownMenuItem("Youtube Channel", href='https://www.youtube.com/channel/UC-pBvv8mzLpj0k-RIbc2Nog?view_as=subscriber'),
         dbc.DropdownMenuItem("SPR Review Automation", href='https://www.imf.org'),
         dbc.DropdownMenuItem(divider=True),
         dbc.DropdownMenuItem("Project Github", href='https://github.com/cryptopotluck/alpha_vantage_tutorial'),
@@ -35,6 +45,11 @@ dropdown = dbc.DropdownMenu(
 )
 #Navbar Layout
 PLOTLY_LOGO = "https://potluckspaces.sfo2.cdn.digitaloceanspaces.com/static/img/contentcreator.png"
+img_path = './dashboard/src/imf_seal.png'
+def encode_image(image_file):
+    encoded = base64.b64encode(open(image_file, 'rb').read())
+    return 'data:image/png;base64,{}'.format(encoded.decode())
+
 navbar = dbc.Navbar(
     dbc.Container(
         [
@@ -42,8 +57,9 @@ navbar = dbc.Navbar(
                 # Use row and col to control vertical alignment of logo / brand
                 dbc.Row(
                     [
-                        dbc.Col(html.Img(src=PLOTLY_LOGO, height="30px")),
-                        dbc.Col(dbc.NavbarBrand("SPR Rview Automation", className="ml-2")),
+                        #dbc.Col(html.Img(src=PLOTLY_LOGO, height="30px")),
+                        dbc.Col(html.Img(src=encode_image(img_path), height="60px")),
+                        dbc.Col(dbc.NavbarBrand("SPR Rview Automation", className='ml-2')),
                     ],
                     align="center",
                     no_gutters=True,
@@ -159,12 +175,13 @@ for i in [2]:
     )(toggle_navbar_collapse)
 
 
+### prepare variables for callbacks ####
 filter_ids = list(filter_tiems_sets.keys())
 check_list_ids = list(Check_tiems_sets.keys())
 dynamic_checklist_outputs = [Output(c,'options') for c in check_list_ids]
 stype_outputs = [Output('checklist1', 'style'),Output('upload-data-container', 'style')]
 custom_outputs=stype_outputs + dynamic_checklist_outputs
-dynamic_checklist_options = [Check_tiems_sets[c] for c in check_list_ids] #list(Check_tiems_sets.values())
+#dynamic_checklist_options = [Check_tiems_sets[c] for c in check_list_ids] #list(Check_tiems_sets.values())
 
 @app.callback(
     custom_outputs,
@@ -175,10 +192,14 @@ def output(n_clicks, i1,i2,i3,i4):
     if sum([len(i1),len(i2),len(i3),len(i4)])==0:
         raise PreventUpdate
     else:
-        c_id = "{}-{}-{}-{}".format(i1[0],i2[0],i3[0],i4[0])
+        c_id = "{}_{}_{}_{}".format(i1[0],i2[0],i3[0],i4[0])
         print(c_id)
         res = [{'display':'block'},{'margin':'1rem','display':'block'}]
         #dynamic_checklist_options = [[],[],[]]
+        sheet_id = [i for i in ids if c_id in i]
+        Check_tiems_sets = data_processor.get_checklist_items(check_input_file,sheet_id[0])
+        check_list_ids = list(Check_tiems_sets.keys())
+        dynamic_checklist_options = [Check_tiems_sets[c] for c in check_list_ids]
         res.extend(dynamic_checklist_options)
         return res
 
