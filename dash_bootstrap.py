@@ -11,65 +11,9 @@ from io import BytesIO
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 sys.path.insert(0,'./dashboard')
+from data_input_utils import filter_tiems_sets,Check_tiems_sets ## input contents for check lists
+from page_build_utils import build_check_items2,build_card
 
-
-##### dash page build functions ######################3
-def build_filter_check_list(key,options):
-    ## hotbutton issues 
-    ele = dcc.Checklist(
-                        id=key,
-                        options=options,
-                        value=[],
-                        labelStyle={'display': 'block'}
-                    )
-    return ele
-
-def build_card(key,options):
-    onecard = dbc.Card(
-        [
-            #dbc.CardImg(src="/assets/images/placeholder286x180.png", top=True),
-            dbc.CardHeader("",style={'background-color':'#a2b9bc'}),
-            dbc.CardBody(
-                [
-                    html.H4(key, className="card-title"),
-                    build_filter_check_list(key,options),
-                    #dbc.Button("Go somewhere", color="primary"),
-                ],
-                style={'padding':'1rem'}
-            ),
-        ],
-        style={'width': "14rem",'height':'100%','border':'0'},
-    )
-    return onecard
-
-def build_check_items(custom_items_sets):
-    ## hotbutton issues 
-    elements = []
-    for header,check_items in custom_items_sets.items():
-        ele = html.Div(children=[
-                    html.H5(header,
-                            style={'margin': '5px',
-                                   'padding':'5px',
-                                   }),
-                    dcc.Checklist(
-                        id=header,
-                        options=check_items,
-                        value=[],
-                        labelStyle={'display': 'inline-block',
-                                    'padding':"10px",
-                                    'width':'23.5%',
-                                    'borderWidth':'1px',
-                                    'margin':'6px',
-                                    'borderRadius': '5px',
-                                    'borderStyle': 'solid'
-                                    }
-                    )
-                    ],style={'width': '70rem','margin': '10px'}
-                )
-        ele = dbc.Row(ele,justify="center")
-        elements.append(ele)
-    
-    return dbc.Col(id='checklist1',children=elements,style={'display': 'none'})
 ##############################################################
     
 
@@ -125,31 +69,6 @@ navbar = dbc.Navbar(
 
 
 #####################################################
-
-filter_tiems_sets = {"Account":[{"label":"PRGT",'value':"PRGT"},{"label":"GRA",'value':"GRA"}],
-                     "Stage":[{"label":"Request",'value':"Request"},{"label":"Review",'value':"Review"}],
-                     "Document":[{"label":"PN",'value':"PN"},{"label":"SR",'value':"SR"}],
-                     "Disbursement":[{"label":"Disbursing",'value':"Disbursing"},{"label":"Emergency",'value':"Emergency"},
-                                     {"label":"Precautionary",'value':"Precautionary"},{"label":"Non-Dispursing",'value':"Non-Dispursing"}],
-                      }
-
-Check_tiems_sets = {"Content":[
-                                {"label":"PRGT",'value':"PRGT"},
-                                {"label":"Type of arrangment",'value':"Type of arrangment"},
-                                {"label":"Length of arrangment",'value':"Length of arrangment"},
-                                {"label":"Exceptional access",'value':"Exceptional access"},
-                                ],
-                    "Table":[
-                                {"label":"Selected Economic and Financial Indicator",'value':"Selected Economic and Financial Indicator"},
-                                {"label":"Central/General Government Operations",'value':"Central/General Government Operations"},
-                                {"label":"Balance of payments ",'value':"Balance of payments"},
-                                ],
-                    "Formal Drafting Requirements":[
-                                {"label":"Cover memo",'value':"Cover memo"},
-                                {"label":"Executive summary",'value':"Executive summary"},
-                                {"label":"Program modality",'value':"Program modality"},
-                                ],
-                     }
 
 Fund_color_pallet = [] ## will use color pallet latter
 
@@ -213,7 +132,7 @@ app.layout = html.Div([
     cards,
     submit_button,
     file_upload_element,
-    build_check_items(Check_tiems_sets),
+    build_check_items2(Check_tiems_sets),
     #html.Div(id='check_items',style={'display': 'block'}),
     #submit_button2,
     html.Div(id='intermediate-value',style={'display': 'block'}),
@@ -221,7 +140,7 @@ app.layout = html.Div([
 ])
 
 
-
+#%%
 ############################################################
 # callbacks 
 ##################################33
@@ -241,9 +160,14 @@ for i in [2]:
 
 
 filter_ids = list(filter_tiems_sets.keys())
+check_list_ids = list(Check_tiems_sets.keys())
+dynamic_checklist_outputs = [Output(c,'options') for c in check_list_ids]
+stype_outputs = [Output('checklist1', 'style'),Output('upload-data-container', 'style')]
+custom_outputs=stype_outputs + dynamic_checklist_outputs
+dynamic_checklist_options = [Check_tiems_sets[c] for c in check_list_ids] #list(Check_tiems_sets.values())
 
 @app.callback(
-    [Output('checklist1', 'style'),Output('upload-data-container', 'style')],
+    custom_outputs,
     [Input('submit-button', 'n_clicks')],
     [State(i,'value') for i in filter_ids]
     )
@@ -253,10 +177,11 @@ def output(n_clicks, i1,i2,i3,i4):
     else:
         c_id = "{}-{}-{}-{}".format(i1[0],i2[0],i3[0],i4[0])
         print(c_id)
-        return [{'display':'block'},{'margin':'1rem','display':'block'}]
+        res = [{'display':'block'},{'margin':'1rem','display':'block'}]
+        #dynamic_checklist_options = [[],[],[]]
+        res.extend(dynamic_checklist_options)
+        return res
 
-
-checklist_ids = list(Check_tiems_sets.keys())
 
 # @app.callback(
 #     Output('intermediate-value', 'children'),
